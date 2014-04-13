@@ -196,7 +196,7 @@ void spi_lld_start(SPIDriver *spip) {
 #if LPC17xx_SPI_USE_SSP0
     if (&SPID1 == spip) {
       LPC_SC->PCONP |= (1UL << 21);
-      LPC_SC->PCLKSEL0 &= (PCLKSEL_MASK << 20);
+      LPC_SC->PCLKSEL0 &= ~(PCLKSEL_MASK << 20);
       LPC_SC->PCLKSEL0 |= (LPC17xx_SPI_SSP0_PCLKSEL << 20);
       nvicEnableVector(SSP0_IRQn,
                        CORTEX_PRIORITY_MASK(LPC17xx_SPI_SSP0_IRQ_PRIORITY));
@@ -205,7 +205,7 @@ void spi_lld_start(SPIDriver *spip) {
 #if LPC17xx_SPI_USE_SSP1
     if (&SPID2 == spip) {
       LPC_SC->PCONP |= (1UL << 10);
-      LPC_SC->PCLKSEL1 &= (PCLKSEL_MASK << 10);
+      LPC_SC->PCLKSEL1 &= ~(PCLKSEL_MASK << 10);
       LPC_SC->PCLKSEL1 |= (LPC17xx_SPI_SSP0_PCLKSEL << 10);
       nvicEnableVector(SSP1_IRQn,
                        CORTEX_PRIORITY_MASK(LPC17xx_SPI_SSP1_IRQ_PRIORITY));
