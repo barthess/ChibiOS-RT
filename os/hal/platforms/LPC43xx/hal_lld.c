@@ -42,11 +42,11 @@
 #define LPC_BASE_CLK_ARRAY_NUM        27
 
 const uint32_t lpc_idiv[LPC_IDIV_ARRAY_NUM] = {
-  (((uint32_t)LPC_IDIVA_SRC) << 24) | (LPC_IDIVA_DIV << 2) | (!LPC_IDIVA_ENABLE),
-  (((uint32_t)LPC_IDIVB_SRC) << 24) | (LPC_IDIVB_DIV << 2) | (!LPC_IDIVB_ENABLE),
-  (((uint32_t)LPC_IDIVC_SRC) << 24) | (LPC_IDIVC_DIV << 2) | (!LPC_IDIVC_ENABLE),
-  (((uint32_t)LPC_IDIVD_SRC) << 24) | (LPC_IDIVD_DIV << 2) | (!LPC_IDIVD_ENABLE),
-  (((uint32_t)LPC_IDIVE_SRC) << 24) | (LPC_IDIVE_DIV << 2) | (!LPC_IDIVE_ENABLE)
+  (((uint32_t)LPC_IDIVA_SRC) << 24) | ((LPC_IDIVA_DIV - 1) << 2) | (!LPC_IDIVA_ENABLE),
+  (((uint32_t)LPC_IDIVB_SRC) << 24) | ((LPC_IDIVB_DIV - 1) << 2) | (!LPC_IDIVB_ENABLE),
+  (((uint32_t)LPC_IDIVC_SRC) << 24) | ((LPC_IDIVC_DIV - 1) << 2) | (!LPC_IDIVC_ENABLE),
+  (((uint32_t)LPC_IDIVD_SRC) << 24) | ((LPC_IDIVD_DIV - 1) << 2) | (!LPC_IDIVD_ENABLE),
+  (((uint32_t)LPC_IDIVE_SRC) << 24) | ((LPC_IDIVE_DIV - 1) << 2) | (!LPC_IDIVE_ENABLE)
 };
 
 const uint32_t lpc_base_clk[LPC_BASE_CLK_ARRAY_NUM] = {
@@ -146,12 +146,17 @@ void lpc_clock_init(void) {
   LPC_CGU->BASE_M4_CLK = (CLK_SEL_IRC << 24);          /* Select IRC as clock source for BASE_M4_CLK */
 #endif
 
-  LPC_CGU->PLL1_CTRL = 0;                               /* Power-down PLL1 enabled by Boot ROM */
+  LPC_CGU->PLL1_CTRL = 1;                               /* Power-down PLL1 enabled by Boot ROM */
 
 #if LPC_PLL1_ENABLE /* PLL1 works in direct or non-integer mode. */
   /* Set PLL1 to FCLKOUT/2 */
-  LPC_CGU->PLL1_CTRL = (1UL << 24) | (LPC_PLL1_CTRL_MSEL << 16) |
+#if LPC_XTAL_ENABLE
+  LPC_CGU->PLL1_CTRL = (CLK_SEL_XTAL << 24) | (LPC_PLL1_CTRL_MSEL << 16) |
+                        (LPC_PLL1_CTRL_NSEL << 12);
+#else
+  LPC_CGU->PLL1_CTRL = (CLK_SEL_IRC << 24) | (LPC_PLL1_CTRL_MSEL << 16) |
                       (LPC_PLL1_CTRL_NSEL << 12);
+#endif
 
   while (!(LPC_CGU->PLL1_STAT & 0x01))
         ;                                               /* Wait for PLL1 locked */
@@ -182,12 +187,39 @@ void lpc_clock_init(void) {
       preg++;
   }
 
-#if LPC_PLL0USB0_ENABLE
-#error "PPL0USB0 not supported."
-#endif /* LPC_PLL0USB_ENABLE == TRUE */
+#if LPC_PLL0USB0_ENABLE && LPC_XTAL_ENABLE
+    /* Mode 1d Normal operating mode with post-divider and with pre-divider. */
 
-#if LPC_PLL0AUDIO_ENABLE
-#error "PLL0AUDIO not supported."
+    LPC_CGU->PLL0USB_CTRL = 1;                      /* Power down PLL0USB. */
+
+    /* Set PLL0USB m, n and p dividers. */
+    LPC_CGU->PLL0USB_MDIV = LPC_PLL0USB_MDIV;
+    LPC_CGU->PLL0USB_NP_DIV = LPC_PLL0USB_NP_DIV;
+
+    LPC_CGU->PLL0USB_CTRL = (CLK_SEL_XTAL << 24);   /* Power up PLL0USB with XTAL source clock. */
+
+    while (!(PLL0USB_STAT & 0x01))
+            ;                                       /* Wait for PLL0USB locked. */
+
+    LPC_CGU->PLL0USB_CTRL |= (1 << 4);              /* PLL0USB clock enable. */
+#endif /* LPC_PLL0USB_ENABLE == TRUE && LPC_XTAL_ENABLE == TRUE. */
+
+#if LPC_PLL0AUDIO_ENABLE && LPC_XTAL_ENABLE
+    /* PLL0AUDIO using the fractional divider. */
+
+    LPC_CGU->PLL0AUDIO_CTRL = 1;                        /* Power down PLL0AUDIO. */
+
+    /* Set PLL0AUDIO dividers. */
+    LPC_CGU->PLL0AUDIO_FRAC = LPC_PLLF0RACT_CTRL;
+    LPC_CGU->PLL0AUDIO_NP_DIV = LPC_PLL0AUDIO_NP_DIV;
+
+    LPC_CGU->PLL0AUDIO_CTRL = (CLK_SEL_XTAL << 24) | (1UL << 12);   /* Power up PLL0AUDIO with XTAL source clock. */
+
+    while (!(LPC_CGU->PLL0AUDIO_STAT & 0x01))
+            ;                                         /* Wait for PLL0AUDIO locked. */
+
+    LPC_CGU->PLL0AUDIO_CTRL |= (1 << 4);              /* PLL0AUDIO clock enable. */
+
 #endif /* LPC_PLL0AUDIO == TRUE */
 }
 
